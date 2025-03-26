@@ -1,6 +1,6 @@
-﻿namespace ConsoleClient;
+﻿namespace DavidTielke.PMA.Data.FileStoring;
 
-class FileReader
+public class FileReader : IFileReader
 {
     public IEnumerable<string> ReadLines(string path)
     {

@@ -1,0 +1,185 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Queries>
+  <Group Name="Quality Gates" Active="True" ShownInReport="False">
+    <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <QualityGate Name="No Errors in NDepend" Unit="issues" />
+failif count > 0 issues
+from i in Issues
+select new { i }]]></Query>
+  </Group>
+  <Group Name="Design" Active="True" ShownInReport="False">
+    <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Alle zu großen Klassen</Name>
+warnif count > 0 
+from t in JustMyCode.Types
+where  t.NbLinesOfCode > 2
+select new { t, t.NbLinesOfCode, Debt = t.NbLinesOfCode.Linear(230,30,1000, 138).ToMinutes().ToDebt(), Severity = Severity.High }
+]]></Query>
+    <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Alle zu großen oder komplexen Methoden</Name>
+warnif count > 0 
+
+from t in JustMyCode.Types
+
+let trueMethods = t.Methods.Where(m => !m.IsPropertyGetter && !m.IsPropertySetter && !m.IsConstructor && !m.IsStatic)
+let invalidMethods = trueMethods.Where(m => m.NbLinesOfCode > 2 || m.CyclomaticComplexity > 1)
+
+where invalidMethods.Any()
+
+select new { t, invalidMethods }
+
+// warnif count > 0 
+// let trueMethods = JustMyCode.Methods.Where(m => !m.IsPropertyGetter && !m.IsPropertySetter && !m.IsConstructor && !m.IsStatic)
+// from m in trueMethods
+// where m.NbLinesOfCode > 2 || m.CyclomaticComplexity > 1
+// select new { m.ParentType, m, m.NbLinesOfCode, m.CyclomaticComplexity }
+]]></Query>
+    <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Keine statischen Klassen</Name>
+warnif count > 0 
+from t in JustMyCode.Types
+where t.IsStatic && !t.IsGeneratedByCompiler
+
+select new { t }
+]]></Query>
+    <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Keine statischen Member</Name>
+warnif count > 0 
+from m in JustMyCode.Members
+where m.IsStatic && !m.IsGeneratedByCompiler && m.SimpleName != "Main"
+select new { m.ParentType, m }
+]]></Query>
+    <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Keine Vererbung</Name>
+warnif count > 0 
+
+let managementClasses = JustMyCode.Types.Where(t => !t.ParentNamespace.FullName.Contains(".DataClasses"))
+                                        .Where(t => !t.IsInterface && !t.IsGeneratedByCompiler)
+
+from t in managementClasses
+
+let baseClasses = t.BaseClasses.Where(bc => bc.FullName != "System.Object")
+
+where baseClasses.Any()
+
+select new { t, baseClasses  }]]></Query>
+  </Group>
+  <Group Name="Namensmuster" Active="True" ShownInReport="False">
+    <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Klassen ohne Namensmuster</Name>
+warnif count > 0
+// #### BLACKLISTING
+let blacklistedAssemblies = new string[]
+{
+
+}
+let blacklistNamespaceSuffix = new string[]{"DataClasses"}
+let blacklistNamespacePrefix = new string[]{}
+
+let typesFiltered = JustMyCode.Types
+                    .Where(t => !blacklistedAssemblies.Contains(t.ParentAssembly.Name))
+                    .Where(t => !t.IsGeneratedByCompiler)
+                    .Where(t => blacklistNamespaceSuffix.All(bns => !t.ParentNamespace.Name.EndsWith(bns)))
+                    .Where(t => blacklistNamespacePrefix.All(bns => !t.ParentNamespace.Name.StartsWith(bns)))
+
+// #### NAMENSMUSTER
+let namePatterns = new string[] 
+{
+ "Manager",
+ "Parser",
+ "Repository",
+ "Reader",
+ "DisplayCommand",
+ 
+ "Program"
+}
+
+// #### ABFRAGE
+from t in typesFiltered
+where !namePatterns.Any(np => t.SimpleName.EndsWith(np))
+select new { t }
+]]></Query>
+    <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Verstöße gegen Namensmuster Manager</Name>
+warnif count > 0 
+
+let namePattern = "Manager"
+
+let allowedMethods = new string[]
+{
+ "Add",
+ "Remove",
+ "Update"
+}
+
+let allowedMethodPrefixes = new string[]
+{
+ "Get",
+ "Is",
+ "Are"
+}
+
+let managementClasses = JustMyCode.Types.Where(t => !t.ParentNamespace.FullName.Contains(".DataClasses") && !t.IsGeneratedByCompiler)
+
+let namePatternClasses = managementClasses.Where(t => t.SimpleName.EndsWith(namePattern))
+
+from t in namePatternClasses 
+
+let invalidMethods = t.Methods.Where(m => !allowedMethods.Any(am => m.SimpleName == am) 
+                                       && !allowedMethodPrefixes.Any(mp => m.SimpleName.StartsWith(mp)))
+
+where invalidMethods.Any()
+
+select new { t, invalidMethods  }
+]]></Query>
+    <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Verstöße gegen Namensmuster Repository</Name>
+warnif count > 0 
+
+let namePattern = "Repository"
+
+let allowedMethods = new string[]
+{
+ "Insert",
+ "Update",
+ "Delete",
+ "Query"
+}
+
+let allowedMethodPrefixes = new string[]
+{
+ 
+}
+
+let managementClasses = JustMyCode.Types.Where(t => !t.ParentNamespace.FullName.Contains(".DataClasses") && !t.IsGeneratedByCompiler)
+
+let namePatternClasses = managementClasses.Where(t => t.SimpleName.EndsWith(namePattern))
+
+from t in namePatternClasses 
+
+let invalidMethods = t.Methods.Where(m => !allowedMethods.Any(am => m.SimpleName == am) 
+                                       && !allowedMethodPrefixes.Any(mp => m.SimpleName.StartsWith(mp)))
+
+where invalidMethods.Any()
+
+select new { t, invalidMethods  }
+
+]]></Query>
+  </Group>
+  <Group Name="Abhängigkeiten" Active="True" ShownInReport="False">
+    <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Alle Managementklassen entkoppelt</Name>
+warnif count > 0 
+
+let classBlacklist = new string[]
+{
+ "App",
+ "Program",
+ "ServiceCollectionFactory"
+}
+
+let managementClasses = JustMyCode.Types.Where(t => !t.IsGeneratedByCompiler 
+                                                 && !t.ParentNamespace.FullName.Contains(".DataClasses")
+                                                 && !classBlacklist.Any(cb => t.SimpleName == cb))
+
+from t in managementClasses
+
+let illegalDependencies = t.TypesUsed.Where(t1 => !t1.IsThirdParty && !t1.IsGeneratedByCompiler && !t1.IsInterface)
+                              .Where(t1 => !t1.ParentNamespace.FullName.Contains(".DataClasses"))
+
+where illegalDependencies .Any()
+
+select new { t, illegalDependencies }
+]]></Query>
+  </Group>
+</Queries>
